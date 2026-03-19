@@ -135,7 +135,7 @@ CONTAINER ID   IMAGE     COMMAND                  CREATED          STATUS       
 🌞 **Call me**
 
 ```bash
-ENJOYYYY :)
+ENJOYYYY :)  http://10.100.0.18:7777/
 ``` 
 
 # Part II : Images
@@ -144,20 +144,22 @@ ENJOYYYY :)
 
 🌞 **Construire votre propre image**
 
-```bash
-
-``` 
-
 🌞 **OU ALORS**
-
-```bash
-
-``` 
 
 🌞 **Dans les deux cas, j'attends juste votre `Dockerfile` dans le compte-rendu**
 
 ```bash
+FROM ubuntu
 
+RUN apt update -y && apt install -y apache2
+
+RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
+
+COPY index.html /var/www/html/index.html
+
+EXPOSE 80
+
+CMD ["apache2ctl", "-D", "FOREGROUND"]
 ``` 
 
 # Part III : `docker-compose`
