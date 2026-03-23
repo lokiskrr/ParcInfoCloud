@@ -170,8 +170,14 @@ CMD ["apache2ctl", "-D", "FOREGROUND"]
 
 🌞 **Installez un WikiJS** en utilisant Docker
 
-```bash
-
+j'ai oublié de prendre les commandes sur le terminal donc les voici
+```bash 
+mkdir wikijs-project
+cd wikijs-project
+nano docker-compose.yml
+docker compose up -d
+docker compose ps
+docker compose logs -f wiki
 ``` 
 
 🌞 **Call me** when it's done
