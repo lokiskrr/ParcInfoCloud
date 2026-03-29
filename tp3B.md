@@ -226,7 +226,15 @@ lines 1-21/21 (END)
 🌞 **Créez une VM qui servira à créer le template**
 
 ```bash 
-
+fatma@ubuntu:~$ az vm create \
+  --name vm-harden \
+  --resource-group tp1-ne \
+  --location denmarkeast \
+  --image almalinux:almalinux-x86_64:9-gen2:latest \
+  --admin-username azureuser \
+  --generate-ssh-keys \
+  --size Standard_B1s \
+  --public-ip-sku Standard
 ```
 
 # TP3B Part4 - A. Firewalling baby
@@ -234,7 +242,50 @@ lines 1-21/21 (END)
 🌞 **Firewall conf**
 
 ```bash 
+[azureuser@vm-harden ~]$ sudo systemctl status firewalld
+Unit firewalld.service could not be found.
+[azureuser@vm-harden ~]$ sudo dnf install firewalld -y
+[azureuser@vm-harden ~]$ sudo systemctl enable --now firewalld
+[azureuser@vm-harden ~]$ sudo systemctl status firewalld
+● firewalld.service - firewalld - dynamic firewall daemon
+     Loaded: loaded (/usr/lib/systemd/system/firewalld.service; enabled; preset>
+     Active: active (running) since Sun 2026-03-29 14:51:25 UTC; 9s ago
+       Docs: man:firewalld(1)
+   Main PID: 2128 (firewalld)
+      Tasks: 2 (limit: 5160)
+     Memory: 25.3M (peak: 27.3M)
+        CPU: 308ms
+     CGroup: /system.slice/firewalld.service
+             └─2128 /usr/bin/python3 -s /usr/sbin/firewalld --nofork --nopid
 
+Mar 29 14:51:24 vm-harden systemd[1]: Starting firewalld - dynamic firewall dae>
+Mar 29 14:51:25 vm-harden systemd[1]: Started firewalld - dynamic firewall daem>
+lines 1-13/13 (END)
+
+[azureuser@vm-harden ~]$ sudo firewall-cmd --list-services
+cockpit dhcpv6-client ssh
+
+[azureuser@vm-harden ~]$ sudo firewall-cmd --permanent --add-port=22/tcp
+success
+
+[azureuser@vm-harden ~]$ sudo firewall-cmd --reload
+success
+
+[azureuser@vm-harden ~]$ sudo firewall-cmd --list-all
+public (active)
+  target: default
+  icmp-block-inversion: no
+  interfaces: eth0
+  sources: 
+  services: cockpit
+  ports: 22/tcp
+  protocols: 
+  forward: yes
+  masquerade: no
+  forward-ports: 
+  source-ports: 
+  icmp-blocks: 
+  rich rules: 
 ```
 
 # TP3B Part4 - B. Stronk SSH
@@ -242,13 +293,28 @@ lines 1-21/21 (END)
 🌞 **Proposez une conf OpenSSH forte**
 
 ```bash 
+[azureuser@vm-harden ~]$ sudo bash -c 'cat > /etc/ssh/sshd_config << "EOF"
+> # /etc/ssh/sshd_config
 
+Port 22
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+Protocol 2
+MaxAuthTries 3
+LoginGraceTime 30
+LogLevel VERBOSE
+AllowUsers azureuser
+X11Forwarding no
+AllowTcpForwarding no
+EOF'
 ```
 
 ⭐ **BONUS** :
 
 ```bash 
-
+i will do it at the end (maybe)
 ```
 
 # TP3B Part4 - C. fail2ban
@@ -256,13 +322,78 @@ lines 1-21/21 (END)
 🌞 **Installer et configurer `fail2ban`**
 
 ```bash 
+[azureuser@vm-harden ~]$ sudo dnf install -y epel-release
 
+[azureuser@vm-harden ~]$ sudo dnf install -y fail2ban
+
+[azureuser@vm-harden ~]$ fail2ban-client --version
+Fail2Ban v1.1.0
+
+sudo bash -c 'cat > /etc/fail2ban/jail.local << "EOF"
+[sshd]
+enabled = true
+port = 22
+filter = sshd
+logpath = /var/log/secure
+maxretry = 2
+findtime = 3600
+bantime = -1
+EOF'
+
+[azureuser@vm-harden ~]$ sudo systemctl restart fail2ban
+[azureuser@vm-harden ~]$ sudo systemctl status fail2ban
+● fail2ban.service - Fail2Ban Service
+     Loaded: loaded (/usr/lib/systemd/system/fail2ban.service; disabled; preset>
+     Active: active (running) since Sun 2026-03-29 15:16:57 UTC; 6s ago
+       Docs: man:fail2ban(1)
+    Process: 3533 ExecStartPre=/bin/mkdir -p /run/fail2ban (code=exited, status>
+   Main PID: 3534 (fail2ban-server)
+      Tasks: 5 (limit: 5160)
+     Memory: 12.2M (peak: 12.6M)
+        CPU: 133ms
+     CGroup: /system.slice/fail2ban.service
+             └─3534 /usr/bin/python3 -s /usr/bin/fail2ban-server -xf start
+
+Mar 29 15:16:57 vm-harden systemd[1]: Starting Fail2Ban Service...
+Mar 29 15:16:57 vm-harden systemd[1]: Started Fail2Ban Service.
+Mar 29 15:16:57 vm-harden fail2ban-server[3534]: Server ready
+lines 1-15/15 (END)
+
+[azureuser@vm-harden ~]$ 
+[azureuser@vm-harden ~]$ sudo fail2ban-client status sshd
+Status for the jail: sshd
+|- Filter
+|  |- Currently failed:	2
+|  |- Total failed:	2
+|  `- Journal matches:	_SYSTEMD_UNIT=sshd.service + _COMM=sshd + _COMM=sshd-session
+`- Actions
+   |- Currently banned:	0
+   |- Total banned:	0
+   `- Banned IP list:	
 ```
 
 🌞 **Prouvez que `fail2ban` fonctionne**
 
 ```bash 
+fatma@ubuntu:~$ ssh -i ~/.ssh/cle_test azureuser@9.205.153.216
+azureuser@9.205.153.216: Permission denied (publickey).
+fatma@ubuntu:~$ ssh -i ~/.ssh/cle_test azureuser@9.205.153.216
+azureuser@9.205.153.216: Permission denied (publickey).
 
+
+fatma@ubuntu:~$ ssh -i ~/.ssh/mauvaise_cle azureuser@9.205.153.216
+Last login: Sun Mar 29 15:50:55 2026 from 88.173.243.32
+
+[azureuser@vm-harden ~]$ sudo fail2ban-client status sshd
+Status for the jail: sshd
+|- Filter
+|  |- Currently failed: 3
+|  |- Total failed:     3
+|  `- Journal matches:  _SYSTEMD_UNIT=sshd.service + _COMM=sshd + _COMM=sshd-session
+`- Actions
+   |- Currently banned: 1
+   |- Total banned:     1
+   `- Banned IP list:   8...2
 ```
 
 # TP3B Part4 - D. Harden kernel parameters
@@ -273,6 +404,57 @@ lines 1-21/21 (END)
 
 ```bash 
 
+Modification : 
+
+net.ipv4.ip_forward = 0
+net.ipv4.tcp_syncookies = 1
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.default.rp_filter = 1
+
+
+
+[azureuser@vm-harden ~]$ sudo nano /etc/sysctl.d/99-harden.conf
+[azureuser@vm-harden ~]$ sudo sysctl --system
+* Applying /usr/lib/sysctl.d/10-default-yama-scope.conf ...
+* Applying /usr/lib/sysctl.d/50-coredump.conf ...
+* Applying /usr/lib/sysctl.d/50-default.conf ...
+* Applying /usr/lib/sysctl.d/50-libkcapi-optmem_max.conf ...
+* Applying /usr/lib/sysctl.d/50-pid-max.conf ...
+* Applying /usr/lib/sysctl.d/50-redhat.conf ...
+* Applying /etc/sysctl.d/99-harden.conf ...
+* Applying /etc/sysctl.d/99-sysctl.conf ...
+* Applying /etc/sysctl.conf ...
+kernel.yama.ptrace_scope = 0
+kernel.core_pattern = |/usr/lib/systemd/systemd-coredump %P %u %g %s %t %c %h %d %F
+kernel.core_pipe_limit = 16
+fs.suid_dumpable = 2
+kernel.sysrq = 16
+kernel.core_uses_pid = 1
+net.ipv4.conf.default.rp_filter = 2
+net.ipv4.conf.eth0.rp_filter = 2
+net.ipv4.conf.lo.rp_filter = 2
+net.ipv4.conf.default.accept_source_route = 0
+net.ipv4.conf.eth0.accept_source_route = 0
+net.ipv4.conf.lo.accept_source_route = 0
+net.ipv4.conf.default.promote_secondaries = 1
+net.ipv4.conf.eth0.promote_secondaries = 1
+net.ipv4.conf.lo.promote_secondaries = 1
+net.ipv4.ping_group_range = 0 2147483647
+net.core.default_qdisc = fq_codel
+fs.protected_hardlinks = 1
+fs.protected_symlinks = 1
+fs.protected_regular = 1
+fs.protected_fifos = 1
+net.core.optmem_max = 81920
+kernel.pid_max = 4194304
+kernel.kptr_restrict = 1
+net.ipv4.conf.default.rp_filter = 1
+net.ipv4.conf.eth0.rp_filter = 1
+net.ipv4.conf.lo.rp_filter = 1
+net.ipv4.ip_forward = 0
+net.ipv4.tcp_syncookies = 1
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.default.rp_filter = 1
 ```
 
 # TP3B Part4 - E. IDS
@@ -284,12 +466,42 @@ lines 1-21/21 (END)
 🌞 **Installer l'IDS AIDE**
 
 ```bash 
-
+[azureuser@vm-harden ~]$ sudo dnf install aide -y
 ```
 
 🌞 **Proposer une conf AIDE**
 
 ```bash 
+sudo nano /etc/aide.conf
+
+/etc/ssh/sshd_config
+/etc/sysctl.d/99-harden.conf
+
+[azureuser@vm-harden ~]$ sudo aide --init
+Start timestamp: 2026-03-29 16:14:53 +0000 (AIDE 0.16)
+AIDE initialized database at /var/lib/aide/aide.db.new.gz
+
+Number of entries:	33048
+
+---------------------------------------------------
+The attributes of the (uncompressed) database(s):
+---------------------------------------------------
+
+/var/lib/aide/aide.db.new.gz
+  MD5      : QsWzcob8GBdGuG1oRTcGqA==
+  SHA1     : +YBdjpet3K3klrpKm8ImOkRAm9s=
+  RMD160   : cGrnMXAQlO5ixGi13G0wNTswMiU=
+  TIGER    : 2tb2DOCZFlU36q655wdzYrKlO/RGoFj0
+  SHA256   : CVf6ej9+ZPfrpvBc/e+vwe3Pmjb4eHKZ
+             jO0KMys0UaA=
+  SHA512   : cmBe4SfQFS6EkKAO9xKOFZZtlDyfTV/Q
+             44dDJwfasjVkpjhi2+V37b0T4cTuKSwM
+             g35yvXBOyxYPdmFjImTueA==
+
+
+End timestamp: 2026-03-29 16:15:19 +0000 (run time: 0m 26s)
+
+
 
 ```
 
@@ -312,7 +524,7 @@ lines 1-21/21 (END)
 ```bash 
 
 ```
-
+- configuration simple et sécurisée
 🌞 **Indiquer à systemd qu'on a modifié les services**
 
 ```bash 
