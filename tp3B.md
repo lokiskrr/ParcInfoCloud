@@ -508,13 +508,37 @@ End timestamp: 2026-03-29 16:15:19 +0000 (run time: 0m 26s)
 🌞 **Initialiser la base de données AIDE**
 
 ```bash 
+[azureuser@vm-harden ~]$ sudo aide --init 
+Start timestamp: 2026-03-29 18:43:43 +0000 (AIDE 0.16)
+AIDE initialized database at /var/lib/aide/aide.db.new.gz
 
+Number of entries:	33048
+
+---------------------------------------------------
+The attributes of the (uncompressed) database(s):
+---------------------------------------------------
+
+/var/lib/aide/aide.db.new.gz
+  MD5      : LaoXLElCJRvzi06J/Sj6Bw==
+  SHA1     : 3z6KshA8FCDmjuUQ890Y6ixCpl0=
+  RMD160   : a1uO28xo+Gm+J+3PHdFtLflA5NA=
+  TIGER    : 1/A3G8yU6Eh7MAYXrXxy33EOMxe5kIs0
+  SHA256   : XG+L96rNqy+xULXxPVjQuDCWV/RpaOpo
+             3JLRgXMFHK4=
+  SHA512   : pyx6bteFZQ8TBLQUGAiYcxCnZRg8b+WY
+             Bw15OsvCO7rtaKhMmXfNbo5vqu4rbmK8
+             wdltdtPwFIgPC7s0xAEiiQ==
+
+
+End timestamp: 2026-03-29 18:44:07 +0000 (run time: 0m 24s)
 ```
 
 🌞 **Jouer avec les tests d'intégrité AIDE**
 
 ```bash 
-
+[azureuser@vm-harden ~]$ sudo aide --check
+[azureuser@vm-harden ~]$ sudo echo "# test intrusion" >> /etc/ssh/sshd_config
+[azureuser@vm-harden ~]$ sudo aide --check
 ```
 
 ## 3. Automated
@@ -522,25 +546,52 @@ End timestamp: 2026-03-29 16:15:19 +0000 (run time: 0m 26s)
 🌞 **Créer un service systemd pour lancer un test AIDE**
 
 ```bash 
+[azureuser@vm-harden ~]$ sudo nano /etc/systemd/system/aide-test.service
 
+[Unit]
+Description=Run an AIDE integrity check
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/aide-check-discord.sh
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target
 ```
 - configuration simple et sécurisée
 🌞 **Indiquer à systemd qu'on a modifié les services**
 
 ```bash 
-
+[azureuser@vm-harden ~]$ sudo systemctl daemon-reload
 ```
 
 🌞 **Tester le service**
 
 ```bash 
-
+[azureuser@vm-harden ~]$ sudo systemctl start aide-test
+[azureuser@vm-harden ~]$ systemctl status aide-test
+[azureuser@vm-harden ~]$ journalctl -xe -u aide-test
 ```
 
 🌞 **Créer un *timer* systemd**
 
 ```bash 
+[azureuser@vm-harden ~]$ sudo nano /etc/systemd/system/aide-test.timer
+[azureuser@vm-harden ~]$ sudo systemctl enable --now aide-test.timer
+Created symlink /etc/systemd/system/timers.target.wants/aide-test.timer → /etc/systemd/system/aide-test.timer.
+[azureuser@vm-harden ~]$ systemctl list-timers | grep aide
+Sun 2026-03-29 20:00:00 UTC 41min left    -                           -            aide-test.timer              aide-test.service
 
+[Unit]
+Description=Run AIDE check every hour
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
 ```
 
 ## 4. Bonus : Alerte Discord
@@ -558,13 +609,33 @@ End timestamp: 2026-03-29 16:15:19 +0000 (run time: 0m 26s)
 🌞 **Clean la VM**
 
 ```bash 
-
+[azureuser@vm-harden ~]$ history -c
+[azureuser@vm-harden ~]$ rm -f ~/.bash_history
+[azureuser@vm-harden ~]$ sudo cloud-init clean
+[azureuser@vm-harden ~]$ sudo waagent -deprovision+user -force
+WARNING! The waagent service will be stopped.
+WARNING! All SSH host key pairs will be deleted.
+WARNING! Cached DHCP leases will be deleted.
+WARNING! root password will be disabled. You will not be able to login as root.
+WARNING! /etc/resolv.conf will be deleted.
+WARNING! azureuser account and entire home directory will be deleted.
+2026-03-29T19:21:17.151698Z INFO MainThread Examine /proc/net/route for primary interface
+2026-03-29T19:21:17.152484Z INFO MainThread Primary interface is [eth0]
+[azureuser@vm-harden ~]$ sudo rm -rf /var/log/*
+[azureuser@vm-harden ~]$ sudo rm -rf /tmp/*
+[azureuser@vm-harden ~]$ sudo rm -rf /var/tmp/*
 ```
 
 🌞 **Faire de la VM un template**
 
 ```bash 
+fatma@ubuntu:~$ az vm deallocate --resource-group tp1-ne --name vm-harden
+fatma@ubuntu:~$ az vm deallocate --resource-group tp1-ne --name vm-harden
 
+fatma@ubuntu:~$ az image create \
+  --resource-group tp1-ne \
+  --name alma-hardened \
+  --source vm-harden
 ```
 
 ## 2. Test
@@ -572,11 +643,22 @@ End timestamp: 2026-03-29 16:15:19 +0000 (run time: 0m 26s)
 🌞 **Lancer une VM à partir de cette image**
 
 ```bash 
-
+fatma@ubuntu:~$ az vm create \
+  --resource-group tp1-ne \
+  --name vm-test \
+  --image alma-hardened \
+  --admin-username azureuser \
+  --ssh-key-values ~/.ssh/cle_test.pub \
+  --size Standard_B2s_v2 \
+  --public-ip-sku Standard
 ```
 
 🌞 **Vérif**
 
 ```bash 
+fatma@ubuntu:~$ ssh -i ~/.ssh/mauvaise_cle azureuser@9.205.153.216
+[azureuser@vm-test ~]$
 
+[azureuser@vm-test ~]$ sudo aide --check
+[azureuser@vm-test ~]$ systemctl status aide-test
 ```
